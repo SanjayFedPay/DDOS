@@ -11,3 +11,4 @@ cd DDOS
 
 pip3 install --force-reinstall --ignore-installed --break-system-packages -r requirements.txt
 
+pip3 install --force-reinstall --ignore-installed --break-system-packages torch torchvision torchaudio
