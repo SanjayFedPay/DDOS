@@ -5,7 +5,7 @@ import time
 from threading import Timer
 
 # Your bot token from BotFather
-BOT_TOKEN = '6182166277:AAGzDXMe4QBbG6fQcBFdBVygqf7ci7qkwQc'
+BOT_TOKEN = '6489358174:AAH2L3e-oHlyGFwe5mugwV9T26o-3G9w508'
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # Dictionary to store user data and timers
