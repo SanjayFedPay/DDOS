@@ -5,7 +5,7 @@ import time
 from threading import Timer
 
 # Your bot token from BotFather
-BOT_TOKEN = '6489358174:AAH2L3e-oHlyGFwe5mugwV9T26o-3G9w508'
+BOT_TOKEN = '6182166277:AAGzDXMe4QBbG6fQcBFdBVygqf7ci7qkwQc'
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # Dictionary to store user data and timers
@@ -71,11 +71,15 @@ def background_processing(chat_id, i_value, message_id=None):
             if item:
                 found = True
                 try:
+                    # Determine the color based on the number
+                    number = int(item['r'])
+                    color_emoji = "🔴" if number % 2 == 0 else "🟢"
+
                     # Send the result message with the "Stop" button
-                    result_message = f"✅ Result Found!\n\n📅 Period: {item['p']}\n🔢 Number: {item['r']}"
+                    result_message = f"✅ Result Found!\n\n📅 Period: {item['p']}\n🔢 Number: {item['r']}\n🎨 Color: {color_emoji}"
                     markup = types.InlineKeyboardMarkup()
                     stop_btn = types.InlineKeyboardButton(text="🚫 Stop", callback_data="stop_processing")
-                   # markup.add(stop_btn)
+                    markup.add(stop_btn)
                     if message_state.get(processing_message_id, {}).get('content') != result_message or \
                        message_state.get(processing_message_id, {}).get('markup') != markup:
                         bot.edit_message_text(result_message, chat_id, processing_message_id, reply_markup=markup)
@@ -135,14 +139,16 @@ def check_last_interaction(chat_id):
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = message.chat.id
-    if check_last_interaction(chat_id):
-        msg = bot.send_message(chat_id, '👋 Welcome to the Future Results Bot!\n Made By Sanjay_Src \n Join Telegram : @SrcEsp\n🔍 Please Enter Last 3 Digits of the Period !')
-        bot.register_next_step_handler(msg, process_i_value)
-    else:
-        markup = types.InlineKeyboardMarkup()
-        btn = types.InlineKeyboardButton(text="🔄 Get Latest Periods", callback_data="get_periods")
-        markup.add(btn)
-        bot.send_message(chat_id, '👋 Welcome to the Future Results Bot!\n\n🔍 Click the button below to get the latest periods and discover your results!', reply_markup=markup)
+    # Stop any ongoing processing
+    if chat_id in processing_status:
+        del processing_status[chat_id]
+        bot.send_message(chat_id, "🚫 Processing stopped. Restarting from the beginning...")
+        if chat_id in auto_find_next_timers:
+            auto_find_next_timers[chat_id].cancel()
+            del auto_find_next_timers[chat_id]
+    # Prompt for initial input
+    msg = bot.send_message(chat_id, '👋 Welcome to the Future Results Bot!\n Made By Sanjay_Src \n Join Telegram : @SrcEsp\n🔍 Please Enter Last 3 Digits of the Period !')
+    bot.register_next_step_handler(msg, process_i_value)
     user_last_interaction[chat_id] = time.time()
 
 # Callback query handler for "Find Next" button
