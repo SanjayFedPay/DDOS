@@ -75,7 +75,7 @@ def background_processing(chat_id, i_value, message_id=None):
                     result_message = f"✅ Result Found!\n\n📅 Period: {item['p']}\n🔢 Number: {item['r']}"
                     markup = types.InlineKeyboardMarkup()
                     stop_btn = types.InlineKeyboardButton(text="🚫 Stop", callback_data="stop_processing")
-                    markup.add(stop_btn)
+                   # markup.add(stop_btn)
                     if message_state.get(processing_message_id, {}).get('content') != result_message or \
                        message_state.get(processing_message_id, {}).get('markup') != markup:
                         bot.edit_message_text(result_message, chat_id, processing_message_id, reply_markup=markup)
