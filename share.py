@@ -1,5 +1,6 @@
 import telebot
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaDocument, InputMediaVideo
+import re
 
 # Your bot token
 BOT_TOKEN = '6182166277:AAGzDXMe4QBbG6fQcBFdBVygqf7ci7qkwQc'
@@ -10,13 +11,12 @@ CHANNEL_NAMES = ['RevRoxy', 'SrcEsp']
 # Initialize the bot
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# Dictionary to store user files
+# Dictionary to store user files and captions
 user_files = {}
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    # Create an inline keyboard with buttons
-    keyboard = InlineKeyboardMarkup(row_width=2)  # Arrange buttons in rows of 2
+    keyboard = InlineKeyboardMarkup(row_width=2)
     share_button = InlineKeyboardButton("📤 Share Files", callback_data='share_files')
     help_button = InlineKeyboardButton("❓ Help", callback_data='help')
     keyboard.add(share_button, help_button)
@@ -34,22 +34,25 @@ def send_help(message):
 def handle_file(message):
     user_id = message.from_user.id
 
-    # Initialize user files list if not already present
     if user_id not in user_files:
-        user_files[user_id] = {'photos': [], 'documents': [], 'videos': []}
+        user_files[user_id] = {'photos': [], 'documents': [], 'videos': [], 'captions': {}}
 
-    # Collect the file ID based on content type
     if message.content_type == 'document':
         file_id = message.document.file_id
+        caption = message.caption if message.caption else ""
         user_files[user_id]['documents'].append(file_id)
+        user_files[user_id]['captions'][file_id] = caption
     elif message.content_type == 'photo':
         file_id = message.photo[-1].file_id
+        caption = message.caption if message.caption else ""
         user_files[user_id]['photos'].append(file_id)
+        user_files[user_id]['captions'][file_id] = caption
     elif message.content_type == 'video':
         file_id = message.video.file_id
+        caption = message.caption if message.caption else ""
         user_files[user_id]['videos'].append(file_id)
+        user_files[user_id]['captions'][file_id] = caption
 
-    # Notify the user that the file is being processed
     bot.reply_to(message, "✅ File received! Use the '📤 Share Files' button or /share command to share them.")
 
 @bot.message_handler(commands=['share'])
@@ -60,13 +63,11 @@ def share_files(message):
         bot.reply_to(message, "⚠️ No files to share. Please send files first.")
         return
 
-    # Create inline keyboard for channel selection
     keyboard = InlineKeyboardMarkup(row_width=1)
     for idx, channel_name in enumerate(CHANNEL_NAMES):
         button = InlineKeyboardButton(channel_name, callback_data=f'share_{CHANNEL_IDS[idx]}')
         keyboard.add(button)
 
-    # Add a "Finish and Share Another File" button
     finish_button = InlineKeyboardButton("Finish and Share Another File", callback_data='finish_and_share_another')
     keyboard.add(finish_button)
 
@@ -88,28 +89,30 @@ def handle_channel_share(call):
 
     try:
         media_group = []
+        captions = user_files[user_id]['captions']
 
-        # Add photos to media group
         for photo_id in files['photos']:
-            media_group.append(InputMediaPhoto(photo_id))
+            caption = captions.get(photo_id, "")
+            caption = replace_channel_info(caption, channel_id)
+            media_group.append(InputMediaPhoto(photo_id, caption=caption))
 
-        # Add videos to media group
         for video_id in files['videos']:
-            media_group.append(InputMediaVideo(video_id))
+            caption = captions.get(video_id, "")
+            caption = replace_channel_info(caption, channel_id)
+            media_group.append(InputMediaVideo(video_id, caption=caption))
 
-        # Add documents to media group
         for doc_id in files['documents']:
-            media_group.append(InputMediaDocument(doc_id))
+            caption = captions.get(doc_id, "")
+            caption = replace_channel_info(caption, channel_id)
+            media_group.append(InputMediaDocument(doc_id, caption=caption))
 
         if media_group:
             bot.send_media_group(channel_id, media_group)
 
-        # Safely retrieve the channel name
         channel_name = CHANNEL_NAMES[CHANNEL_IDS.index(channel_id)] if channel_id in CHANNEL_IDS else channel_id
         bot.send_message(call.message.chat.id, f"✅ Files have been shared to {channel_name}.")
 
     except Exception as e:
-        # Safely retrieve the channel name
         channel_name = CHANNEL_NAMES[CHANNEL_IDS.index(channel_id)] if channel_id in CHANNEL_IDS else channel_id
         bot.send_message(call.message.chat.id, f"❌ Failed to send to {channel_name}: {e}")
 
@@ -118,16 +121,30 @@ def handle_finish_and_share_another(call):
     user_id = call.from_user.id
     bot.answer_callback_query(call.id, "Finishing current file and preparing for another.")
     
-    # Clear the user's current files after sharing
-    user_files[user_id] = {'photos': [], 'documents': [], 'videos': []}
+    user_files[user_id] = {'photos': [], 'documents': [], 'videos': [], 'captions': {}}
 
     bot.send_message(call.message.chat.id, "✅ Finished with the current file. Please send another file to share.")
-    # The user can now send another file, which will be handled by the `handle_file` function.
 
 @bot.callback_query_handler(func=lambda call: call.data == 'help')
 def callback_help(call):
     bot.send_message(call.message.chat.id, 
                      "🔹 **How to Use:**\n\n1. Send files (photos, videos, or documents) to me.\n2. Use the /share command or press the '📤 Share Files' button to share collected files to one or more channels.\n\n🔹 **Commands:**\n- `/start`: Start the bot and see the options.\n- `/help`: Get help about using the bot.")
+
+def replace_channel_info(caption, channel_id):
+    """
+    Replace all occurrences of '@channelname' in the caption with '@mychannel',
+    where '@mychannel' is the channel name where the message is being sent.
+    """
+    channel_name = CHANNEL_NAMES[CHANNEL_IDS.index(channel_id)] if channel_id in CHANNEL_IDS else "@Unknown"
+
+    # Match '@channelname' but not 'click to copy' text
+    def replace(match):
+        return f'@{channel_name}' if match.group(1) else match.group(0)
+
+    # Replace all occurrences of '@channelname' with '@mychannel'
+    # Ensure not to replace '@somemonotext'
+    caption = re.sub(r'(@\w+)', lambda match: replace(match), caption)
+    return caption
 
 # Start polling
 bot.polling(none_stop=True)
