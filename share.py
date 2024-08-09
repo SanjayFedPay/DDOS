@@ -147,4 +147,11 @@ def replace_channel_info(caption, channel_id):
     return caption
 
 # Start polling
-bot.polling(none_stop=True)
+while True:
+    try:
+        bot.polling(none_stop=True)
+    except Exception as e:
+        print(f"Bot encountered an error: {e}")
+        print("Restarting in 5 seconds...")
+        time.sleep(5)  # Wait before restarting to avoid rapid restart loops
+
