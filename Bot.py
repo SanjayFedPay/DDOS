@@ -158,4 +158,11 @@ def process_i_value(message):
         msg = bot.send_message(chat_id, "🚫 Invalid input. Please enter a valid number.")
         bot.register_next_step_handler(msg, process_i_value)
 
-bot.polling(none_stop=True, interval=2)
+while True:
+    try:
+        bot.polling(none_stop=True)
+    except Exception as e:
+        print(f"Bot encountered an error: {e}")
+        print("Restarting in 5 seconds...")
+        time.sleep(5)  # Wait before restarting to avoid rapid restart loops
+
